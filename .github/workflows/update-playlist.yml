@@ -1,0 +1,53 @@
+name: Update M3U Playlist
+
+on:
+  # Chạy tự động mỗi giờ
+  schedule:
+    - cron: "0 * * * *"
+
+  # Chạy thủ công từ tab Actions
+  workflow_dispatch:
+
+  # Chạy khi push thay đổi script
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/convert.py"
+      - ".github/workflows/update-playlist.yml"
+
+jobs:
+  convert:
+    name: Convert JSON → M3U
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run converter
+        env:
+          JSON_PLAYLIST_URL: "https://raw.githubusercontent.com/winmk2021/nguon/main/channels.json"
+        run: python scripts/convert.py
+
+      - name: Commit playlist.m3u
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add playlist.m3u
+          if git diff --staged --quiet; then
+            echo "No changes detected in playlist.m3u"
+          else
+            git commit -m "chore: update playlist.m3u [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+            git push
+            echo "Playlist pushed successfully."
+          fi
